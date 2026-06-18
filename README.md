@@ -3,15 +3,15 @@
 A deep learning project that classifies road surface images into three damage
 categories — **pothole**, **crack**, and **manhole** — using a custom
 Convolutional Neural Network (CNN), compared against a MobileNetV2 transfer
-learning baseline. The project includes a trained model, a research report, and
-a deployed web application.
+learning baseline. The project includes the trained model, a research report, and
+a live web application that runs the model directly in the browser.
 
 **Author:** Jaskaran Singh
 **Student ID:** 33633568
 **Course:** Pattern Recognition — M.Sc. Software Engineering
 **University:** University of Europe for Applied Sciences
 
-**Live demo:** https://huggingface.co/spaces/jaskaranarora1/road-damage-detection-cnn
+**Live website:** _ADD YOUR NETLIFY URL HERE_
 
 ---
 
@@ -46,7 +46,7 @@ high visual variability and fewer samples.
 ```
 road-damage-detection-cnn/
 ├── README.md                  This file
-├── requirements.txt           Python dependencies
+├── requirements.txt           Python dependencies (for training)
 ├── .gitignore
 ├── main.py                    Training script (trains + saves models, figures)
 ├── model_results.csv          Final accuracy/loss results
@@ -63,10 +63,11 @@ road-damage-detection-cnn/
 ├── notebooks/                 Kaggle notebook
 ├── proposal/                  Phase 2 proposal document
 │
-├── app.py                     Flask web application (local version)
-├── templates/
-│   └── index.html             Web app interface
-└── static/uploads/            Uploaded images (runtime)
+└── website/                   Live web app (runs the model in the browser)
+    ├── index.html             Web interface (TensorFlow.js)
+    └── tfjs_model/            Model converted to TensorFlow.js format
+        ├── model.json
+        └── group1-shard1of4.bin ... group1-shard4of4.bin
 ```
 
 ## How to Run the Training
@@ -84,22 +85,22 @@ python main.py
 
 Outputs are saved to `models/` (trained models) and `figures/` (plots).
 
-## How to Run the Web App Locally
+## The Web Application
+
+The web app classifies a road image as a pothole, crack, or manhole. It uses
+**TensorFlow.js** to run the trained CNN entirely in the browser — no server
+required. The Keras model was converted to TensorFlow.js format (the
+`website/tfjs_model/` folder).
+
+**Run it locally:**
 
 ```bash
-# 1. Make sure models/custom_cnn_model.keras exists (from training)
-
-# 2. Start the app
-python app.py
-
-# 3. Open the URL shown in the terminal (usually http://127.0.0.1:5000)
+cd website
+python -m http.server 8000
+# then open http://localhost:8000 in your browser
 ```
 
-Upload a road image, click **Detect damage**, and the app shows the predicted
-class with confidence scores for all three categories.
-
-The app is also deployed live on Hugging Face Spaces (see the live demo link
-above).
+The app is also deployed live (see the live website link above).
 
 ## Methodology Summary
 
@@ -121,7 +122,7 @@ Accuracy, loss, precision, recall, F1-score, and confusion matrix.
 ## Tech Stack
 
 Python · TensorFlow / Keras · NumPy · Pillow · scikit-learn · Matplotlib ·
-Seaborn · Flask · Gradio (deployment)
+Seaborn · TensorFlow.js (web app)
 
 ---
 

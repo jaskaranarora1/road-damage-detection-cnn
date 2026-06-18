@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Road Damage Detection · CNN</title>
+<meta name="description" content="Detect road damage — potholes, cracks, manholes — from images using a custom CNN running in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<style>
+  :root {
+    --asphalt: #16181d; --asphalt-2: #1d2127; --asphalt-3: #262b33;
+    --line: #313842; --amber: #f5a623; --amber-soft: #ffcf6b;
+    --ink: #eef1f5; --ink-dim: #9aa3b0; --ink-faint: #5f6875;
+    --pothole: #f5a623; --crack: #5da9e9; --manhole: #9d7bea; --radius: 14px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Space Grotesk', sans-serif; background: var(--asphalt);
+    color: var(--ink); line-height: 1.6; min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(245,166,35,0.06), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(157,123,234,0.05), transparent 40%);
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  header {
+    border-bottom: 1px solid var(--line); padding: 22px 0; position: sticky; top: 0;
+    background: rgba(22,24,29,0.82); backdrop-filter: blur(12px); z-index: 50;
+  }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .brand-mark {
+    width: 40px; height: 40px; border-radius: 9px; background: var(--amber);
+    display: grid; place-items: center; position: relative; overflow: hidden; flex-shrink: 0;
+  }
+  .brand-mark::before {
+    content: ""; position: absolute; width: 4px; height: 140%;
+    background: repeating-linear-gradient(var(--asphalt) 0 6px, transparent 6px 12px);
+  }
+  .brand-text h1 { font-size: 16px; font-weight: 600; }
+  .brand-text p { font-size: 12px; color: var(--ink-dim); font-family: 'JetBrains Mono', monospace; }
+  .header-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-dim);
+    border: 1px solid var(--line); padding: 6px 12px; border-radius: 100px;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .header-badge .led { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); transition: background .3s; }
+  .header-badge .led.ready { background: #28c840; box-shadow: 0 0 8px #28c840; }
+  .hero { padding: 60px 0 34px; text-align: center; }
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--amber); margin-bottom: 18px;
+  }
+  .hero h2 { font-size: clamp(34px, 6vw, 58px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.02; margin-bottom: 18px; }
+  .hero h2 .accent { color: var(--amber); }
+  .hero p { color: var(--ink-dim); font-size: 17px; max-width: 540px; margin: 0 auto; }
+  .console { background: var(--asphalt-2); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 28px; }
+  .console-bar { display: flex; align-items: center; gap: 8px; padding: 13px 18px; border-bottom: 1px solid var(--line); background: var(--asphalt-3); }
+  .dot { width: 11px; height: 11px; border-radius: 50%; }
+  .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+  .console-title { margin-left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-faint); }
+  .console-body { display: grid; grid-template-columns: 1fr 1fr; min-height: 420px; }
+  @media (max-width: 760px) { .console-body { grid-template-columns: 1fr; } }
+  .pane { padding: 28px; }
+  .pane.left { border-right: 1px solid var(--line); }
+  @media (max-width: 760px) { .pane.left { border-right: none; border-bottom: 1px solid var(--line); } }
+  .pane-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 16px; }
+  .dropzone {
+    border: 2px dashed var(--line); border-radius: 12px; aspect-ratio: 4 / 3;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; cursor: pointer; text-align: center; padding: 24px;
+    transition: border-color .2s, background .2s; position: relative; overflow: hidden;
+  }
+  .dropzone:hover { border-color: var(--amber); background: rgba(245,166,35,0.04); }
+  .dropzone.dragging { border-color: var(--amber); background: rgba(245,166,35,0.08); }
+  .dropzone.has-image { border-style: solid; padding: 0; }
+  .dz-icon { width: 52px; height: 52px; border-radius: 12px; background: var(--asphalt-3); display: grid; place-items: center; color: var(--amber); }
+  .dz-icon svg { width: 26px; height: 26px; }
+  .dz-text { font-size: 15px; font-weight: 500; }
+  .dz-hint { font-size: 13px; color: var(--ink-faint); font-family: 'JetBrains Mono', monospace; }
+  .dropzone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .scanline { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--amber), transparent); box-shadow: 0 0 14px 2px var(--amber); top: 0; opacity: 0; pointer-events: none; }
+  .dropzone.scanning .scanline { opacity: 1; animation: scan 1.3s ease-in-out infinite; }
+  @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+  .file-name { margin-top: 14px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--ink-dim); text-align: center; word-break: break-all; }
+  .btn {
+    margin-top: 18px; width: 100%; background: var(--amber); color: #1a1205; border: none;
+    border-radius: 10px; padding: 15px; font-family: 'Space Grotesk', sans-serif; font-size: 15px;
+    font-weight: 600; cursor: pointer; transition: transform .12s, background .2s;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+  }
+  .btn:hover:not(:disabled) { background: var(--amber-soft); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .pane.right { display: flex; flex-direction: column; }
+  .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: var(--ink-faint); text-align: center; }
+  .empty-state svg { width: 44px; height: 44px; opacity: 0.4; }
+  .empty-state p { font-size: 14px; font-family: 'JetBrains Mono', monospace; }
+  .spinner { width: 34px; height: 34px; border: 3px solid var(--asphalt-3); border-top-color: var(--amber); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .result { display: none; animation: rise .4s ease; }
+  .result.show { display: block; }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .verdict { display: flex; align-items: center; gap: 16px; padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .verdict-ring { width: 76px; height: 76px; flex-shrink: 0; position: relative; }
+  .verdict-ring svg { transform: rotate(-90deg); }
+  .verdict-ring .pct { position: absolute; inset: 0; display: grid; place-items: center; font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 700; }
+  .verdict-meta .vlabel { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+  .verdict-meta .vclass { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; text-transform: capitalize; line-height: 1.1; }
+  .verdict-desc { font-size: 14px; color: var(--ink-dim); margin-bottom: 22px; }
+  .bars-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 14px; }
+  .bar-row { margin-bottom: 14px; }
+  .bar-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .bar-name { font-size: 14px; font-weight: 500; text-transform: capitalize; }
+  .bar-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-dim); }
+  .bar-track { height: 8px; background: var(--asphalt-3); border-radius: 100px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0; border-radius: 100px; transition: width .9s cubic-bezier(.2,.8,.2,1); }
+  .bar-fill.pothole { background: var(--pothole); }
+  .bar-fill.crack { background: var(--crack); }
+  .bar-fill.manhole { background: var(--manhole); }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; margin-bottom: 60px; }
+  @media (max-width: 620px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+  .stat { background: var(--asphalt-2); padding: 22px 20px; }
+  .stat .num { font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700; color: var(--amber); letter-spacing: -0.02em; }
+  .stat .lbl { font-size: 13px; color: var(--ink-dim); margin-top: 4px; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; text-align: center; color: var(--ink-faint); font-size: 13px; }
+  footer b { color: var(--ink-dim); font-weight: 500; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .note { font-size: 12px; color: var(--ink-faint); text-align: center; margin-top: 10px; font-family: 'JetBrains Mono', monospace; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap header-inner">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text"><h1>Road Damage Detection</h1><p>cnn · pattern recognition</p></div>
+    </div>
+    <div class="header-badge"><span class="led" id="modelLed"></span><span id="modelStatus">loading model…</span></div>
+  </div>
+</header>
+<div class="wrap">
+  <section class="hero">
+    <div class="eyebrow">Convolutional Neural Network</div>
+    <h2>Spot road damage<br>in <span class="accent">one image.</span></h2>
+    <p>Upload a road surface image and the trained CNN classifies it as a pothole, crack, or manhole — running entirely in your browser.</p>
+  </section>
+  <section class="console">
+    <div class="console-bar">
+      <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+      <span class="console-title">road_damage_detector · tensorflow.js</span>
+    </div>
+    <div class="console-body">
+      <div class="pane left">
+        <div class="pane-label">01 — Input image</div>
+        <label class="dropzone" id="dropzone" for="fileInput">
+          <span class="scanline"></span>
+          <div class="dz-icon" id="dzIcon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </div>
+          <div class="dz-text" id="dzText">Drop a road image here</div>
+          <div class="dz-hint">or click to browse · jpg / png</div>
+        </label>
+        <input type="file" id="fileInput" accept="image/*" class="sr-only">
+        <div class="file-name" id="fileName"></div>
+        <button class="btn" id="predictBtn" disabled>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span id="btnText">Detect damage</span>
+        </button>
+      </div>
+      <div class="pane right">
+        <div class="pane-label">02 — Prediction</div>
+        <div class="empty-state" id="emptyState">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 3-3 3 3 5-5"/></svg>
+          <p>Results appear here</p>
+        </div>
+        <div class="result" id="result">
+          <div class="verdict">
+            <div class="verdict-ring">
+              <svg width="76" height="76"><circle cx="38" cy="38" r="33" fill="none" stroke="var(--asphalt-3)" stroke-width="7"/><circle id="ringFill" cx="38" cy="38" r="33" fill="none" stroke="var(--amber)" stroke-width="7" stroke-linecap="round" stroke-dasharray="207" stroke-dashoffset="207"/></svg>
+              <span class="pct" id="ringPct">0%</span>
+            </div>
+            <div class="verdict-meta"><div class="vlabel">Detected</div><div class="vclass" id="verdictClass">—</div></div>
+          </div>
+          <p class="verdict-desc" id="verdictDesc"></p>
+          <div class="bars-label">All class scores</div>
+          <div id="bars"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="stats">
+    <div class="stat"><div class="num">63.93%</div><div class="lbl">Test accuracy</div></div>
+    <div class="stat"><div class="num">18,674</div><div class="lbl">Training images</div></div>
+    <div class="stat"><div class="num">3</div><div class="lbl">Damage classes</div></div>
+    <div class="stat"><div class="num">128²</div><div class="lbl">Input resolution</div></div>
+  </section>
+</div>
+<footer>
+  <div class="wrap">
+    <b>Road Damage Detection using CNN</b> — Jaskaran Singh · M.Sc. Software Engineering<br>
+    University of Europe for Applied Sciences · Pattern Recognition Project
+  </div>
+</footer>
+<script>
+  const CLASS_NAMES = ["pothole", "crack", "manhole"]; // index 0,1,2 — matches training
+  const CLASS_INFO = {
+    pothole: "A depression or hole in the road surface. Potholes are a major safety hazard and a common cause of vehicle damage.",
+    crack: "A surface fracture or fissure in the pavement. Cracks often develop into larger damage if left unrepaired.",
+    manhole: "A manhole cover and the surrounding road surface. Displaced or damaged manholes can pose a risk to traffic."
+  };
+  const colors = { pothole: 'var(--pothole)', crack: 'var(--crack)', manhole: 'var(--manhole)' };
+  const RING_CIRC = 207;
+
+  const fileInput = document.getElementById('fileInput');
+  const dropzone = document.getElementById('dropzone');
+  const fileName = document.getElementById('fileName');
+  const predictBtn = document.getElementById('predictBtn');
+  const btnText = document.getElementById('btnText');
+  const emptyState = document.getElementById('emptyState');
+  const result = document.getElementById('result');
+  const modelLed = document.getElementById('modelLed');
+  const modelStatus = document.getElementById('modelStatus');
+
+  let model = null;
+  let chosenImg = null;
+
+  // Load the TensorFlow.js model on page load
+  (async () => {
+    try {
+      model = await tf.loadLayersModel('tfjs_model/model.json');
+      modelLed.classList.add('ready');
+      modelStatus.textContent = 'model ready';
+      if (chosenImg) predictBtn.disabled = false;
+    } catch (e) {
+      modelStatus.textContent = 'model failed to load';
+      console.error(e);
+    }
+  })();
+
+  function showPreview(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => { chosenImg = img; if (model) predictBtn.disabled = false; };
+      img.src = e.target.result;
+      dropzone.classList.add('has-image');
+      dropzone.innerHTML = '<span class="scanline"></span><img src="' + e.target.result + '" alt="uploaded road image">';
+    };
+    reader.readAsDataURL(file);
+    fileName.textContent = file.name;
+  }
+
+  fileInput.addEventListener('change', e => { if (e.target.files.length) showPreview(e.target.files[0]); });
+  ['dragenter','dragover'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('dragging'); }));
+  ['dragleave','drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('dragging'); }));
+  dropzone.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) showPreview(f); });
+
+  predictBtn.addEventListener('click', async () => {
+    if (!model || !chosenImg) return;
+    predictBtn.disabled = true;
+    btnText.textContent = 'Analyzing…';
+    dropzone.classList.add('scanning');
+
+    // small delay so the scan animation is visible
+    await new Promise(r => setTimeout(r, 400));
+
+    try {
+      const probs = tf.tidy(() => {
+        // Preprocess: resize to 128x128, normalize /255, add batch dim
+        let t = tf.browser.fromPixels(chosenImg)
+          .resizeBilinear([128, 128])
+          .toFloat()
+          .div(255.0)
+          .expandDims(0);
+        const output = model.predict(t);
+        return output.dataSync();
+      });
+
+      const results = CLASS_NAMES.map((label, i) => ({ label, confidence: probs[i] * 100 }))
+        .sort((a, b) => b.confidence - a.confidence);
+      renderResult(results);
+    } catch (e) {
+      btnText.textContent = 'Error — try again';
+      console.error(e);
+    } finally {
+      dropzone.classList.remove('scanning');
+      predictBtn.disabled = false;
+      btnText.textContent = 'Detect damage';
+    }
+  });
+
+  function renderResult(results) {
+    const top = results[0];
+    emptyState.style.display = 'none';
+    result.classList.add('show');
+    document.getElementById('verdictClass').textContent = top.label;
+    document.getElementById('verdictDesc').textContent = CLASS_INFO[top.label];
+
+    const ring = document.getElementById('ringFill');
+    const pct = document.getElementById('ringPct');
+    ring.style.stroke = colors[top.label] || 'var(--amber)';
+    requestAnimationFrame(() => { ring.style.transition = 'stroke-dashoffset 1s ease'; ring.style.strokeDashoffset = RING_CIRC * (1 - top.confidence / 100); });
+    let cur = 0;
+    const tick = setInterval(() => { cur += Math.max(1, top.confidence / 28); if (cur >= top.confidence) { cur = top.confidence; clearInterval(tick); } pct.textContent = cur.toFixed(0) + '%'; }, 22);
+
+    const bars = document.getElementById('bars');
+    bars.innerHTML = '';
+    results.forEach((r, i) => {
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = '<div class="bar-head"><span class="bar-name">' + r.label + '</span><span class="bar-val">' + r.confidence.toFixed(2) + '%</span></div><div class="bar-track"><div class="bar-fill ' + r.label + '"></div></div>';
+      bars.appendChild(row);
+      const fill = row.querySelector('.bar-fill');
+      setTimeout(() => { fill.style.width = r.confidence + '%'; }, 120 + i * 120);
+    });
+  }
+</script>
+</body>
+</html>
