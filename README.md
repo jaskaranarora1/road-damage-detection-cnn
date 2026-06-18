@@ -11,7 +11,8 @@ a live web application that runs the model directly in the browser.
 **Course:** Pattern Recognition — M.Sc. Software Engineering
 **University:** University of Europe for Applied Sciences
 
-**Live website:** _ADD YOUR NETLIFY URL HERE_
+**Live website:** https://road-damage-detection-cnn.netlify.app/
+**GitHub repository:** https://github.com/jaskaranarora1/road-damage-detection-cnn
 
 ---
 
@@ -92,6 +93,8 @@ The web app classifies a road image as a pothole, crack, or manhole. It uses
 required. The Keras model was converted to TensorFlow.js format (the
 `website/tfjs_model/` folder).
 
+**Try it live:** https://road-damage-detection-cnn.netlify.app/
+
 **Run it locally:**
 
 ```bash
@@ -99,8 +102,6 @@ cd website
 python -m http.server 8000
 # then open http://localhost:8000 in your browser
 ```
-
-The app is also deployed live (see the live website link above).
 
 ## Methodology Summary
 
