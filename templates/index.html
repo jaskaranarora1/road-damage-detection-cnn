@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Road Damage Detection</title>
+</head>
+<body>
+
+<h1>Road Damage Detection Using CNN</h1>
+
+<form action="/predict"
+      method="POST"
+      enctype="multipart/form-data">
+
+    <input type="file"
+           name="image"
+           required>
+
+    <button type="submit">
+        Predict
+    </button>
+
+</form>
+
+{% if prediction %}
+
+<h2>Prediction: {{prediction}}</h2>
+
+<h3>Confidence:
+{{confidence}}%</h3>
+
+<img src="{{image}}" width="300">
+
+{% endif %}
+
+</body>
+</html>
