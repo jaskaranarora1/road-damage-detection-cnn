@@ -129,6 +129,37 @@
   footer b { color: var(--ink-dim); font-weight: 500; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .note { font-size: 12px; color: var(--ink-faint); text-align: center; margin-top: 10px; font-family: 'JetBrains Mono', monospace; }
+  .input-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab-btn {
+    flex: 1; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--asphalt-3); color: var(--ink-dim); font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 500; cursor: pointer; transition: all .18s;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .tab-btn:hover { border-color: var(--amber); color: var(--ink); }
+  .tab-btn.active { background: rgba(245,166,35,0.12); border-color: var(--amber); color: var(--amber); }
+  .tab-btn svg { width: 15px; height: 15px; }
+  .camera-view { display: none; flex-direction: column; gap: 12px; }
+  .camera-view.active { display: flex; }
+  .upload-view { display: block; }
+  .upload-view.hidden { display: none; }
+  .video-wrap {
+    border-radius: 12px; overflow: hidden; aspect-ratio: 4/3;
+    background: #000; position: relative; border: 2px solid var(--line);
+  }
+  .video-wrap video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .video-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
+  .video-wrap canvas.show { display: block; }
+  .cam-controls { display: flex; gap: 8px; }
+  .btn-outline {
+    flex: 1; background: transparent; color: var(--ink-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 11px; font-family: 'Space Grotesk', sans-serif; font-size: 14px;
+    font-weight: 500; cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+  }
+  .btn-outline:hover { border-color: var(--amber); color: var(--ink); }
+  .btn-outline svg { width: 16px; height: 16px; }
+  .cam-status { font-size: 12px; color: var(--ink-faint); text-align: center; font-family: 'JetBrains Mono', monospace; min-height: 18px; }
 </style>
 </head>
 <body>
@@ -155,16 +186,49 @@
     <div class="console-body">
       <div class="pane left">
         <div class="pane-label">01 — Input image</div>
-        <label class="dropzone" id="dropzone" for="fileInput">
-          <span class="scanline"></span>
-          <div class="dz-icon" id="dzIcon">
+
+        <div class="input-tabs">
+          <button class="tab-btn active" id="tabUpload">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload
+          </button>
+          <button class="tab-btn" id="tabCamera">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Camera
+          </button>
+        </div>
+
+        <div class="upload-view" id="uploadView">
+          <label class="dropzone" id="dropzone" for="fileInput">
+            <span class="scanline"></span>
+            <div class="dz-icon" id="dzIcon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div class="dz-text" id="dzText">Drop a road image here</div>
+            <div class="dz-hint">or click to browse · jpg / png</div>
+          </label>
+          <input type="file" id="fileInput" accept="image/*" class="sr-only">
+          <div class="file-name" id="fileName"></div>
+        </div>
+
+        <div class="camera-view" id="cameraView">
+          <div class="video-wrap">
+            <video id="camVideo" autoplay playsinline muted></video>
+            <canvas id="camCanvas"></canvas>
           </div>
-          <div class="dz-text" id="dzText">Drop a road image here</div>
-          <div class="dz-hint">or click to browse · jpg / png</div>
-        </label>
-        <input type="file" id="fileInput" accept="image/*" class="sr-only">
-        <div class="file-name" id="fileName"></div>
+          <div class="cam-controls">
+            <button class="btn-outline" id="snapBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/></svg>
+              Capture
+            </button>
+            <button class="btn-outline" id="retakeBtn" style="display:none">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/></svg>
+              Retake
+            </button>
+          </div>
+          <div class="cam-status" id="camStatus">Starting camera…</div>
+        </div>
+
         <button class="btn" id="predictBtn" disabled>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <span id="btnText">Detect damage</span>
@@ -224,30 +288,132 @@
   const modelLed = document.getElementById('modelLed');
   const modelStatus = document.getElementById('modelStatus');
 
+  // Camera elements
+  const tabUpload = document.getElementById('tabUpload');
+  const tabCamera = document.getElementById('tabCamera');
+  const uploadView = document.getElementById('uploadView');
+  const cameraView = document.getElementById('cameraView');
+  const camVideo = document.getElementById('camVideo');
+  const camCanvas = document.getElementById('camCanvas');
+  const snapBtn = document.getElementById('snapBtn');
+  const retakeBtn = document.getElementById('retakeBtn');
+  const camStatus = document.getElementById('camStatus');
+
   let model = null;
   let chosenImg = null;
+  let camStream = null;
+
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  tabUpload.addEventListener('click', () => {
+    tabUpload.classList.add('active');
+    tabCamera.classList.remove('active');
+    uploadView.classList.remove('hidden');
+    cameraView.classList.remove('active');
+    stopCamera();
+    // clear any camera-captured image so state is consistent
+    if (!fileInput.files.length) { chosenImg = null; if (model) predictBtn.disabled = true; }
+  });
+
+  tabCamera.addEventListener('click', () => {
+    tabCamera.classList.add('active');
+    tabUpload.classList.remove('active');
+    uploadView.classList.add('hidden');
+    cameraView.classList.add('active');
+    startCamera();
+  });
+
+  // ── Camera helpers ─────────────────────────────────────────────────────────
+  async function startCamera() {
+    camStatus.textContent = 'Starting camera…';
+    retakeBtn.style.display = 'none';
+    snapBtn.style.display = '';
+    camCanvas.classList.remove('show');
+    camVideo.style.display = 'block';
+    try {
+      camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+      camVideo.srcObject = camStream;
+      camStatus.textContent = 'Camera ready — aim at road damage and capture.';
+    } catch (e) {
+      camStatus.textContent = 'Camera access denied or not available.';
+      console.error(e);
+    }
+  }
+
+  function stopCamera() {
+    if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+  }
+
+  snapBtn.addEventListener('click', () => {
+    if (!camStream) return;
+    camCanvas.width = camVideo.videoWidth;
+    camCanvas.height = camVideo.videoHeight;
+    camCanvas.getContext('2d').drawImage(camVideo, 0, 0);
+    camCanvas.classList.add('show');
+    camVideo.style.display = 'none';
+    retakeBtn.style.display = '';
+    snapBtn.style.display = 'none';
+    camStatus.textContent = 'Photo captured — click "Detect damage" to analyse.';
+
+    // Convert canvas to Image element for TF pipeline
+    const img = new Image();
+    img.onload = () => { chosenImg = img; predictBtn.disabled = false; };
+    img.src = camCanvas.toDataURL('image/jpeg');
+  });
+
+  retakeBtn.addEventListener('click', () => {
+    camCanvas.classList.remove('show');
+    camVideo.style.display = 'block';
+    retakeBtn.style.display = 'none';
+    snapBtn.style.display = '';
+    camStatus.textContent = 'Camera ready — aim at road damage and capture.';
+    chosenImg = null;
+    predictBtn.disabled = true;
+  });
 
   // Load the TensorFlow.js model on page load
   (async () => {
     try {
-      model = await tf.loadLayersModel('tfjs_model/model.json');
+      modelStatus.textContent = 'loading model…';
+      model = await tf.loadLayersModel('model.json');
       modelLed.classList.add('ready');
       modelStatus.textContent = 'model ready';
       if (chosenImg) predictBtn.disabled = false;
     } catch (e) {
-      modelStatus.textContent = 'model failed to load';
-      console.error(e);
+      modelLed.style.background = '#ff5f57';
+      modelStatus.textContent = 'model failed — check bin files';
+      console.error('Model load error:', e);
+      // Still allow button if image chosen — will show error on predict
+      if (chosenImg) predictBtn.disabled = false;
     }
   })();
+
+  // Persistent preview image inside dropzone (never destroy dropzone innerHTML)
+  const dzPreviewImg = document.createElement('img');
+  dzPreviewImg.alt = 'uploaded road image';
+  dzPreviewImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none';
+  dropzone.appendChild(dzPreviewImg);
 
   function showPreview(file) {
     const reader = new FileReader();
     reader.onload = e => {
-      const img = new Image();
-      img.onload = () => { chosenImg = img; if (model) predictBtn.disabled = false; };
-      img.src = e.target.result;
+      const dataUrl = e.target.result;
+      // Show preview
+      dzPreviewImg.src = dataUrl;
+      dzPreviewImg.style.display = 'block';
       dropzone.classList.add('has-image');
-      dropzone.innerHTML = '<span class="scanline"></span><img src="' + e.target.result + '" alt="uploaded road image">';
+      document.getElementById('dzIcon').style.display = 'none';
+      document.getElementById('dzText').style.display = 'none';
+      dropzone.querySelector('.dz-hint').style.display = 'none';
+      // Use the preview img element directly as the source for TF
+      dzPreviewImg.onload = () => {
+        chosenImg = dzPreviewImg;
+        predictBtn.disabled = false;
+      };
+      // If already loaded (cached), fire manually
+      if (dzPreviewImg.complete && dzPreviewImg.naturalWidth > 0) {
+        chosenImg = dzPreviewImg;
+        predictBtn.disabled = false;
+      }
     };
     reader.readAsDataURL(file);
     fileName.textContent = file.name;
@@ -259,10 +425,15 @@
   dropzone.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) showPreview(f); });
 
   predictBtn.addEventListener('click', async () => {
-    if (!model || !chosenImg) return;
+    if (!chosenImg) return;
+    if (!model) {
+      btnText.textContent = 'Model not loaded!';
+      setTimeout(() => { btnText.textContent = 'Detect damage'; }, 2000);
+      return;
+    }
     predictBtn.disabled = true;
     btnText.textContent = 'Analyzing…';
-    dropzone.classList.add('scanning');
+    if (!cameraView.classList.contains('active')) dropzone.classList.add('scanning');
 
     // small delay so the scan animation is visible
     await new Promise(r => setTimeout(r, 400));
