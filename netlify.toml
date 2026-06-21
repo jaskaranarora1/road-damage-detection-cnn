@@ -1,3 +1,6 @@
 [build]
   publish = "website"
-  command = ""
+  command = "echo done"
+
+[build.environment]
+  PYTHON_VERSION = "skip"
