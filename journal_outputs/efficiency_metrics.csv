@@ -1,0 +1,5 @@
+Metric,Value
+Total parameters,3305027
+Trainable parameters,3305027
+Model file size (MB),37.87
+Avg inference time per image (ms),79.22

@@ -26,10 +26,13 @@ against a pre-trained one.
 
 ## Dataset
 
+- **Dataset Source:** [RDD2022 – Road Damage Detection Dataset (Kaggle)](https://www.kaggle.com/datasets/sujityp/rdd2022)
 - **Total images:** 18,674
 - **Classes:** 3 (pothole, crack, manhole)
 - **Split:** 13,148 training · 2,759 validation · 2,767 test
 - **Image type:** JPEG, resized to 128×128 pixels
+
+The dataset contains road damage images collected from multiple countries, including India, China, Norway, and the USA, and was used to train and evaluate the CNN models in this project.
 
 ## Results
 
