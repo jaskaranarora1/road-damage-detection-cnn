@@ -5,3 +5,4 @@ __pycache__/
 static/uploads/*
 !static/uploads/.gitkeep
 .vscode/
+journal_outputs/
