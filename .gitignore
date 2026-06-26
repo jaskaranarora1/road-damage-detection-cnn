@@ -6,3 +6,4 @@ static/uploads/*
 !static/uploads/.gitkeep
 .vscode/
 journal_outputs/
+Presentation/
